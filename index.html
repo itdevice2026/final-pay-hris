@@ -66,7 +66,17 @@
   .note{background:var(--accent);border:1px solid #f3d6d6;border-radius:8px;padding:10px 12px;font-size:11.5px;color:#7a2020;margin-top:10px}
   .totline{display:flex;justify-content:space-between;font-weight:700;padding-top:8px;margin-top:4px;border-top:2px solid var(--line)}
   #payslip{display:none}
-  @media print{body{background:#fff}header,.inputs,.btns{display:none!important}.wrap{display:block;max-width:100%;padding:0}#payslip{display:block}#appwrap{display:block!important}}
+  @page{size:A4 portrait;margin:8mm}
+  @media print{
+    body{background:#fff}
+    header,.inputs,.btns,.summary{display:none!important}
+    .wrap{display:block;max-width:100%;padding:0}
+    #appwrap{display:block!important}
+    #payslip{display:block}
+    .slip{width:100%;box-sizing:border-box;padding:3mm 2mm;page-break-inside:avoid;color:#000}
+    .slip table{width:100%;border-collapse:collapse}
+    .cut{text-align:center;color:#888;font-size:8px;letter-spacing:2px;margin:3mm 0;border:0}
+  }
 </style>
 </head>
 <body>
@@ -272,32 +282,22 @@
         <div class="totline"><span>Total Deductions</span><b id="o_ded" class="neg">₱0.00</b></div>
       </div>
       <div class="net"><small>Net Final Pay</small><div class="amt" id="o_net">₱0.00</div></div>
+      <div class="field" style="margin-top:12px"><label>Approved by (signatory)</label>
+        <select id="signatory">
+          <option value="0">Fritz Martinez — President</option>
+          <option value="1">Ma. Olivia D. Martinez — Vice President</option>
+        </select>
+      </div>
       <div class="btns">
         <button class="act btn-save" onclick="saveRecord()">Save to cloud</button>
-        <button class="act btn-print" onclick="window.print()">Print</button>
+        <button class="act btn-print" onclick="printPayslip()">Print ×2</button>
         <button class="act btn-reset" onclick="resetForm()">Clear</button>
       </div>
     </div>
   </div>
 </div>
 
-<div id="payslip">
-  <div style="max-width:720px;margin:0 auto;padding:30px;font-size:13px">
-    <h2 style="margin:0;text-align:center" id="p_company">COMPANY</h2>
-    <p id="p_coyinfo" style="text-align:center;color:#666;margin:2px 0 0;font-size:11px"></p>
-    <p style="text-align:center;font-weight:700;margin:6px 0 2px">FINAL PAY / BACK-PAY COMPUTATION</p>
-    <p style="text-align:center;color:#666;margin:0 0 18px;font-size:11px">Guided by DOLE Labor Advisory No. 06, s. 2020</p>
-    <table style="width:100%;border-collapse:collapse;margin-bottom:16px">
-      <tr><td style="padding:3px 0"><b>Employee:</b> <span id="p_name"></span></td><td style="padding:3px 0"><b>ID:</b> <span id="p_id"></span></td></tr>
-      <tr><td style="padding:3px 0"><b>Position:</b> <span id="p_pos"></span></td><td style="padding:3px 0"><b>Reason:</b> <span id="p_reason"></span></td></tr>
-      <tr><td style="padding:3px 0"><b>Date Hired:</b> <span id="p_hired"></span></td><td style="padding:3px 0"><b>Last Day:</b> <span id="p_last"></span></td></tr>
-      <tr><td style="padding:3px 0" colspan="2"><b>Length of Service:</b> <span id="p_los"></span> &middot; <b>Monthly:</b> <span id="p_monthly"></span> &middot; <b>Daily:</b> <span id="p_daily"></span></td></tr>
-    </table>
-    <table style="width:100%;border-collapse:collapse" id="p_table"></table>
-    <p style="margin-top:40px;color:#666">Prepared by: ___________________________ &nbsp;&nbsp;&nbsp; Received by: ___________________________</p>
-    <p style="color:#999;font-size:10px">Generated <span id="p_date"></span>. Working document; verify statutory deductions and tax with your accountant.</p>
-  </div>
-</div>
+<div id="payslip"></div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -719,26 +719,68 @@ function compute(){
   $('o_tax').textContent=peso(tax);$('o_acct').textContent=peso(acct);$('o_ded').textContent=peso(ded);$('o_net').textContent=peso(net);
   $('sepNote').textContent=sepRate>0?`${REASON_LABEL[reason]}: ${sepRate===1?'1 month':'½ month'} pay × ${sepYears} yr, min. 1 month.`:`${REASON_LABEL[reason]}: no statutory separation pay (unless company policy provides).`;
   const coy=currentCompany();
-  $('p_company').textContent=(coy&&coy.name)||'COMPANY';
-  $('p_coyinfo').textContent=[coy&&coy.address,coy&&coy.tin?('TIN: '+coy.tin):''].filter(Boolean).join(' · ');
-  $('p_name').textContent=$('empName').value||'—';$('p_id').textContent=$('empId').value||'—';
-  $('p_pos').textContent=$('empPos').value||'—';$('p_reason').textContent=REASON_LABEL[reason];
-  $('p_hired').textContent=$('dateHired').value||'—';$('p_last').textContent=$('lastDay').value||'—';
-  $('p_los').textContent=los.text;$('p_monthly').textContent=peso(monthly);$('p_daily').textContent=peso(daily);
-  $('p_date').textContent=new Date().toLocaleString('en-PH');
-  const rows=[['EARNINGS','',''],['Salary',`${num('unpaidDays')} day(s) × ${peso(daily)}`,salary],
-    ['Unused SIL',`${num('silDays')} day(s) × ${peso(daily)}`,sil],['Unused VL',`${num('vlDays')} day(s) × ${peso(daily)}`,vl],
-    ['13th month pay','',thir],['Other pay','OT / holiday / allowances',other],
-    ['De Minimis','tax-exempt benefits',dm],
-    ['Separation pay',sepRate>0?`${sepRate===1?'1':'½'} mo × ${sepYears} yr × ${peso(sepBase)}`:'—',sep],
-    ['Total Earnings','',gross,'tot'],['DEDUCTIONS','',''],['SSS / PhilHealth / Pag-IBIG','',gov],
-    ['Salary loan / advance','',loans],['Withholding tax','',tax],['Assets & other','',acct],
-    ['Total Deductions','',ded,'tot'],['NET FINAL PAY','',net,'net']];
-  $('p_table').innerHTML=rows.map(r=>{
-    if(r[2]===''&&r[1]==='')return `<tr><td colspan="3" style="padding:10px 0 4px;font-weight:700;border-bottom:2px solid #333">${r[0]}</td></tr>`;
-    const st=r[3]==='net'?'font-weight:800;font-size:15px;border-top:3px double #333':r[3]==='tot'?'font-weight:700;border-top:1px solid #333':'';
-    return `<tr style="${st}"><td style="padding:4px 0">${r[0]}</td><td style="padding:4px 8px;color:#666;font-size:11px">${r[1]}</td><td style="padding:4px 0;text-align:right;font-variant-numeric:tabular-nums">${peso(r[2])}</td></tr>`;
+  SLIP={
+    company:(coy&&coy.name)||'COMPANY', code:(coy&&coy.code)||'',
+    coyinfo:[coy&&coy.address,coy&&coy.tin?('TIN: '+coy.tin):''].filter(Boolean).join(' · '),
+    name:$('empName').value||'—', id:$('empId').value||'—', pos:$('empPos').value||'—',
+    reason:REASON_LABEL[reason], hired:$('dateHired').value||'—', last:$('lastDay').value||'—',
+    los:los.text, monthly:peso(monthly), daily:peso(daily),
+    date:new Date().toLocaleString('en-PH'),
+    sign:SIGNATORIES[parseInt($('signatory').value)||0],
+    rows:[['EARNINGS','',''],['Salary',`${num('unpaidDays')} day(s) × ${peso(daily)}`,salary],
+      ['Unused SIL',`${num('silDays')} day(s) × ${peso(daily)}`,sil],['Unused VL',`${num('vlDays')} day(s) × ${peso(daily)}`,vl],
+      ['13th month pay','',thir],['Other pay','OT / holiday / allowances',other],
+      ['De Minimis','tax-exempt benefits',dm],
+      ['Separation pay',sepRate>0?`${sepRate===1?'1':'½'} mo × ${sepYears} yr × ${peso(sepBase)}`:'—',sep],
+      ['Total Earnings','',gross,'tot'],['DEDUCTIONS','',''],['SSS / PhilHealth / Pag-IBIG','',gov],
+      ['Salary loan / advance','',loans],['Withholding tax','',tax],['Assets & other','',acct],
+      ['Total Deductions','',ded,'tot'],['NET FINAL PAY','',net,'net']]
+  };
+}
+
+/* ================= PAYSLIP PRINT (2 copies / A4) ================= */
+let SLIP=null;
+const SIGNATORIES=[{name:'Fritz Martinez',title:'President'},{name:'Ma. Olivia D. Martinez',title:'Vice President'}];
+function slipRows(rows){
+  return rows.map(r=>{
+    if(r[2]===''&&r[1]==='')return `<tr><td colspan="3" style="padding:4px 0 1px;font-weight:700;border-bottom:1px solid #000;font-size:8px;letter-spacing:.5px">${r[0]}</td></tr>`;
+    const st=r[3]==='net'?'font-weight:800;font-size:11px;border-top:2px double #000':r[3]==='tot'?'font-weight:700;border-top:1px solid #000':'';
+    return `<tr style="${st}"><td style="padding:1.5px 0">${esc(r[0])}</td><td style="padding:1.5px 6px;color:#555;font-size:7.5px">${esc(r[1])}</td><td style="padding:1.5px 0;text-align:right;white-space:nowrap">${peso(r[2])}</td></tr>`;
   }).join('');
+}
+function payslipHTML(label){
+  const s=SLIP; if(!s)return '';
+  return `<div class="slip" style="font-size:9px;line-height:1.3">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start">
+      <div><div style="font-weight:800;font-size:12px">${s.code?esc(s.code)+' — ':''}${esc(s.company)}</div>
+      ${s.coyinfo?`<div style="font-size:7.5px;color:#555">${esc(s.coyinfo)}</div>`:''}
+      <div style="font-weight:700;font-size:9.5px;margin-top:1px">FINAL PAY / BACK-PAY COMPUTATION</div></div>
+      <div style="text-align:right;font-size:8px;color:#333;border:1px solid #999;border-radius:3px;padding:1px 5px;font-weight:700">${label}</div>
+    </div>
+    <table style="width:100%;font-size:8px;margin:3px 0">
+      <tr><td style="padding:1px 0"><b>Employee:</b> ${esc(s.name)}</td><td style="padding:1px 0"><b>ID:</b> ${esc(s.id)}</td></tr>
+      <tr><td style="padding:1px 0"><b>Position:</b> ${esc(s.pos)}</td><td style="padding:1px 0"><b>Reason:</b> ${esc(s.reason)}</td></tr>
+      <tr><td style="padding:1px 0"><b>Date Hired:</b> ${esc(s.hired)}</td><td style="padding:1px 0"><b>Last Day:</b> ${esc(s.last)}</td></tr>
+      <tr><td colspan="2" style="padding:1px 0"><b>LOS:</b> ${esc(s.los)} &middot; <b>Monthly:</b> ${s.monthly} &middot; <b>Daily:</b> ${s.daily}</td></tr>
+    </table>
+    <table style="width:100%;border-collapse:collapse;font-size:9px">${slipRows(s.rows)}</table>
+    <table style="width:100%;margin-top:12px;font-size:8px;text-align:center">
+      <tr>
+        <td style="padding:0 4px">______________________<br>Prepared by</td>
+        <td style="padding:0 4px">______________________<br>Received by (Employee)</td>
+        <td style="padding:0 4px"><b style="font-size:9px">${esc((s.sign||{}).name||'')}</b><br>${esc((s.sign||{}).title||'')}<br>Approved by</td>
+      </tr>
+    </table>
+    <div style="font-size:6.5px;color:#999;margin-top:3px">Guided by DOLE LA 06-20. Generated ${esc(s.date)} &middot; ${label}. Verify statutory deductions/tax with your accountant.</div>
+  </div>`;
+}
+function printPayslip(){
+  if(!SLIP){alert('Compute a final pay first.');return;}
+  $('payslip').innerHTML =
+    payslipHTML("EMPLOYEE'S COPY") +
+    `<div class="cut">— — — — — — — — — — —  ✂  cut here  — — — — — — — — — — —</div>` +
+    payslipHTML("EMPLOYER'S COPY");
+  window.print();
 }
 
 /* ================= SAVE / RESET ================= */
@@ -753,7 +795,8 @@ async function saveRecord(){
     sep_rate:LAST.sepRate,sep_years:LAST.sepYears,sep_base:LAST.sepBase,sep_pay:LAST.sep,
     d_sss:num('dSSS'),d_phic:num('dPHIC'),d_hdmf:num('dHDMF'),d_loans:num('dLoans'),
     d_tax:num('dTax'),d_assets:num('dAssets'),d_other:num('dOther'),
-    gross:LAST.gross,total_deductions:LAST.ded,net_pay:LAST.net};
+    gross:LAST.gross,total_deductions:LAST.ded,net_pay:LAST.net,
+    approved_by:(function(g){return g?g.name+' — '+g.title:'';})(SIGNATORIES[parseInt($('signatory').value)||0])};
   if(!rec.emp_name){alert('Enter an employee name before saving.');return;}
   const{error}=await sb.from('fp_records').insert(rec);
   if(error){alert('Save failed: '+error.message);return;}
@@ -774,6 +817,7 @@ $('sepBase').addEventListener('input',()=>{userTouchedSepBase=true;compute();});
 $('daily').addEventListener('input',()=>{userTouchedDaily=true;compute();});
 $('factor').addEventListener('change',()=>{userTouchedDaily=($('factor').value==='0');compute();});
 $('reason').addEventListener('change',()=>{userTouchedSepRate=false;compute();});
+$('signatory').addEventListener('change',compute);
 ['empName','empId','empPos','resignDate','dateHired','lastDay','monthly','daily','unpaidDays','silDays','vlDays','thirteenth','otherPay','deMinimis','sepYears','sepBase','dSSS','dPHIC','dHDMF','dLoans','dTax','dAssets','dOther']
   .forEach(f=>$(f).addEventListener('input',compute));
 
