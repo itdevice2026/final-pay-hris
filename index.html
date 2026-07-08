@@ -97,10 +97,10 @@
 <div id="accessModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:60;align-items:center;justify-content:center;padding:20px">
   <div class="card" style="width:100%;max-width:480px;margin:0">
     <h2><span class="badge">🔑</span> Manage Access</h2>
-    <p class="sub">Only admins listed here can use the system. New sign-ups have no access until added.</p>
+    <p class="sub"><b>Admin</b> = full control + user management. <b>Payroll Staff</b> = compute, save &amp; upload only. New sign-ups have no access until added here.</p>
     <div id="accessList"></div>
     <div class="btns">
-      <button class="act btn-save" onclick="addAdmin()">+ Add admin</button>
+      <button class="act btn-save" onclick="addAdmin()">+ Add user</button>
       <button class="act btn-reset" onclick="document.getElementById('accessModal').style.display='none'">Close</button>
     </div>
   </div>
@@ -117,11 +117,12 @@
     <select id="company" title="Active company"></select>
     <button onclick="addCompany()">+ Add</button>
     <button onclick="editCompany()">✎ Edit</button>
-    <button onclick="removeCompany()">Remove</button>
+    <button id="btnRemoveCoy" onclick="removeCompany()">Remove</button>
   </div>
   <div class="who">
     <span id="whoami"></span>
-    <button onclick="openAccess()">🔑 Manage Access</button>
+    <span id="roleBadge" style="background:rgba(255,255,255,.25);border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700"></span>
+    <button id="btnAccess" onclick="openAccess()">🔑 Manage Access</button>
     <button onclick="signOut()">Sign out</button>
   </div>
 </header>
@@ -322,16 +323,16 @@ async function signOut(){await sb.auth.signOut();}
 sb.auth.onAuthStateChange((_e,session)=>{ session?showApp(session):showAuth(); });
 function showAuth(){$('auth').style.display='flex';$('appwrap').style.display='none';$('pending').style.display='none';}
 
-let CURRENT_EMAIL='';
-async function isAdmin(email){
+let CURRENT_EMAIL='', CURRENT_ROLE='';
+async function myRole(email){
   const{data}=await sb.from('fp_access').select('role').ilike('email',email).maybeSingle();
-  return !!(data && data.role==='admin');
+  return data ? data.role : null; // 'admin' | 'staff' | null
 }
 async function showApp(session){
   CURRENT_EMAIL=session.user.email;
   $('auth').style.display='none';
-  const admin=await isAdmin(CURRENT_EMAIL);
-  if(!admin){
+  CURRENT_ROLE=await myRole(CURRENT_EMAIL);
+  if(CURRENT_ROLE!=='admin' && CURRENT_ROLE!=='staff'){
     $('appwrap').style.display='none';
     $('pending').style.display='flex';
     $('pendingEmail').textContent=CURRENT_EMAIL;
@@ -340,32 +341,41 @@ async function showApp(session){
   $('pending').style.display='none';
   $('appwrap').style.display='block';
   $('whoami').textContent=session.user.email;
+  const isAdmin=CURRENT_ROLE==='admin';
+  $('roleBadge').textContent=isAdmin?'Admin':'Payroll Staff';
+  $('btnAccess').style.display=isAdmin?'':'none';       // only admins manage users
+  $('btnRemoveCoy').style.display=isAdmin?'':'none';    // only admins delete companies
   await loadCompanies(); await loadRoster(); compute();
 }
 
 /* ================= ACCESS MANAGEMENT (admin) ================= */
 async function openAccess(){ $('accessModal').style.display='flex'; await loadAccess(); }
+function roleLabel(r){return r==='admin'?'Admin':r==='staff'?'Payroll Staff':r;}
 async function loadAccess(){
-  const{data,error}=await sb.from('fp_access').select('*').order('email');
+  const{data,error}=await sb.from('fp_access').select('*').order('role').order('email');
   if(error){$('accessList').innerHTML='<p class="hint" style="color:var(--neg)">'+error.message+'</p>';return;}
   $('accessList').innerHTML=(data||[]).map(a=>{
     const you=a.email.toLowerCase()===CURRENT_EMAIL.toLowerCase();
-    return `<div class="row-money"><span>${a.email}${you?' <b>(you)</b>':''}</span>
-      <button onclick="removeAdmin('${a.email.replace(/'/g,"\\'")}')" style="border:none;background:#eef0f3;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;color:var(--neg)">Remove</button></div>`;
-  }).join('')||'<p class="hint">No admins yet.</p>';
+    const badge=`<span style="background:${a.role==='admin'?'#b02a2a':'#0a7d3c'};color:#fff;border-radius:20px;padding:1px 8px;font-size:10px;font-weight:700;margin-left:6px">${roleLabel(a.role)}</span>`;
+    return `<div class="row-money"><span>${a.email}${you?' <b>(you)</b>':''}${badge}</span>
+      <button onclick="removeUser('${a.email.replace(/'/g,"\\'")}')" style="border:none;background:#eef0f3;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;color:var(--neg)">Remove</button></div>`;
+  }).join('')||'<p class="hint">No users yet.</p>';
 }
-async function addAdmin(){
-  const email=prompt('Grant admin access to which @meatplus.ph email?');
+async function addAdmin(){ // grant access, choosing a role
+  const email=prompt('Grant access to which @meatplus.ph email?');
   if(!email)return;
   if(!/@meatplus\.ph$/i.test(email.trim())){alert('Must be a @meatplus.ph email address.');return;}
-  const{error}=await sb.from('fp_access').insert({email:email.trim().toLowerCase(),role:'admin'});
+  const r=prompt('Role for '+email.trim()+'?\nType "admin" (full control + user management)\nor "staff" (Payroll Staff / Encoder — compute, save, upload).','staff');
+  if(r===null)return;
+  const role=r.trim().toLowerCase()==='admin'?'admin':'staff';
+  const{error}=await sb.from('fp_access').upsert({email:email.trim().toLowerCase(),role},{onConflict:'email'});
   if(error){alert(error.message);return;}
   loadAccess();
 }
-async function removeAdmin(email){
+async function removeUser(email){
   const you=email.toLowerCase()===CURRENT_EMAIL.toLowerCase();
-  if(you){ if(!confirm('Remove your OWN admin access? You will be locked out immediately.'))return; }
-  else if(!confirm('Remove admin access for '+email+'?'))return;
+  if(you){ if(!confirm('Remove your OWN access? You will be locked out immediately.'))return; }
+  else if(!confirm('Remove access for '+email+'?'))return;
   const{error}=await sb.from('fp_access').delete().ilike('email',email);
   if(error){alert(error.message);return;}
   if(you){await signOut();return;}
