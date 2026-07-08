@@ -215,7 +215,6 @@
         </div>
         <div class="field"><label>Date of Resignation / Submitted</label><input id="resignDate" type="date"></div>
         <div class="field"><label>Date Hired</label><input id="dateHired" type="date"></div>
-        <div class="field"><label>Last Day Worked</label><input id="lastDay" type="date"></div>
         <div class="field"><label>Payroll Cut-off (From)</label><input id="cutoffFrom" type="date"></div>
         <div class="field"><label>Payroll Cut-off (To)</label><input id="cutoffTo" type="date"></div>
       </div>
@@ -749,7 +748,7 @@ async function removeEmployee(id){
 
 /* ================= COMPUTE ================= */
 function yearsOfService(){
-  const h=$('dateHired').value,l=$('lastDay').value;if(!h||!l)return{yrs:0,text:'—'};
+  const h=$('dateHired').value,l=$('resignDate').value;if(!h||!l)return{yrs:0,text:'—'};
   const d1=new Date(h),d2=new Date(l);if(d2<d1)return{yrs:0,text:'invalid dates'};
   let months=(d2.getFullYear()-d1.getFullYear())*12+(d2.getMonth()-d1.getMonth());
   if(d2.getDate()<d1.getDate())months-=1;months=Math.max(0,months);
@@ -786,7 +785,7 @@ function compute(){
     company:(coy&&coy.name)||'COMPANY', code:(coy&&coy.code)||'',
     coyinfo:[coy&&coy.address,coy&&coy.tin?('TIN: '+coy.tin):''].filter(Boolean).join(' · '),
     name:$('empName').value||'—', id:$('empId').value||'—', pos:$('empPos').value||'—',
-    reason:REASON_LABEL[reason], hired:$('dateHired').value||'—', last:$('lastDay').value||'—',
+    reason:REASON_LABEL[reason], hired:$('dateHired').value||'—', last:$('resignDate').value||'—',
     cutoff:[$('cutoffFrom').value,$('cutoffTo').value].filter(Boolean).join(' to '), remarks:$('remarks').value||'',
     los:los.text, monthly:peso(monthly), daily:peso(daily),
     date:new Date().toLocaleString('en-PH'), ref:CURRENT_REF||'',
@@ -863,9 +862,9 @@ function printSavedRecord(id){
     coyinfo:[coy.address,coy.tin?('TIN: '+coy.tin):''].filter(Boolean).join(' · '),
     ref:r.ref_no||'',
     name:r.emp_name||'—', id:r.emp_code||'—', pos:r.position||'—',
-    reason:REASON_LABEL[r.reason]||r.reason||'—', hired:r.date_hired||'—', last:r.last_day||'—',
+    reason:REASON_LABEL[r.reason]||r.reason||'—', hired:r.date_hired||'—', last:r.resign_date||'—',
     cutoff:[r.cutoff_date,r.cutoff_to].filter(Boolean).join(' to '), remarks:r.notes||'',
-    los:losBetween(r.date_hired,r.last_day), monthly:peso(+r.monthly||0), daily:peso(daily),
+    los:losBetween(r.date_hired,r.resign_date), monthly:peso(+r.monthly||0), daily:peso(daily),
     date:new Date(r.created_at||Date.now()).toLocaleString('en-PH'),
     sign:{name:sp[0]||'', title:sp[1]||''},
     rows:[['EARNINGS','',''],['Salary',`${r.days_worked||0} day(s) × ${peso(daily)}`,salary],
@@ -886,7 +885,7 @@ function editSavedRecord(id){
   const set=(f,v)=>{ if($(f))$(f).value=(v==null?'':v); };
   set('empName',r.emp_name);set('empId',r.emp_code);set('empPos',r.position);
   $('reason').value=r.reason||'resign';
-  set('resignDate',r.resign_date);set('dateHired',r.date_hired);set('lastDay',r.last_day);set('cutoffFrom',r.cutoff_date);set('cutoffTo',r.cutoff_to);
+  set('resignDate',r.resign_date);set('dateHired',r.date_hired);set('cutoffFrom',r.cutoff_date);set('cutoffTo',r.cutoff_to);
   set('monthly',r.monthly);
   if([...$('factor').options].some(o=>o.value==String(r.factor)))$('factor').value=String(r.factor); else $('factor').value='0';
   set('daily',r.daily);
@@ -947,7 +946,7 @@ function payslipHTML(label){
     <table style="width:100%;font-size:8px;margin:3px 0">
       <tr><td style="padding:1px 0"><b>Employee:</b> ${esc(s.name)}</td><td style="padding:1px 0"><b>ID:</b> ${esc(s.id)}</td></tr>
       <tr><td style="padding:1px 0"><b>Position:</b> ${esc(s.pos)}</td><td style="padding:1px 0"><b>Reason:</b> ${esc(s.reason)}</td></tr>
-      <tr><td style="padding:1px 0"><b>Date Hired:</b> ${esc(s.hired)}</td><td style="padding:1px 0"><b>Last Day:</b> ${esc(s.last)}</td></tr>
+      <tr><td style="padding:1px 0"><b>Date Hired:</b> ${esc(s.hired)}</td><td style="padding:1px 0"><b>Date Resigned:</b> ${esc(s.last)}</td></tr>
       <tr><td colspan="2" style="padding:1px 0"><b>Payroll Cut-off:</b> ${esc(s.cutoff||'—')}</td></tr>
       <tr><td colspan="2" style="padding:1px 0"><b>LOS:</b> ${esc(s.los)} &middot; <b>Monthly:</b> ${s.monthly} &middot; <b>Daily:</b> ${s.daily}</td></tr>
     </table>
@@ -977,7 +976,7 @@ async function saveRecord(){
   const coy=currentCompany();
   const rec={company_id:coy.id||null,company_name:coy.name||'',
     emp_name:$('empName').value,emp_code:$('empId').value,position:$('empPos').value,reason:$('reason').value,
-    resign_date:$('resignDate').value||null,date_hired:$('dateHired').value||null,last_day:$('lastDay').value||null,
+    resign_date:$('resignDate').value||null,date_hired:$('dateHired').value||null,last_day:$('resignDate').value||null,
     cutoff_date:$('cutoffFrom').value||null,cutoff_to:$('cutoffTo').value||null,notes:$('remarks').value||'',
     monthly:num('monthly'),factor:parseInt($('factor').value)||0,daily:LAST.daily,
     days_worked:num('unpaidDays'),sil_days:num('silDays'),vl_days:num('vlDays'),
@@ -1008,7 +1007,7 @@ async function saveRecord(){
 }
 function resetForm(){
   if(!confirm('Clear all fields?'))return;
-  ['empName','empId','empPos','resignDate','dateHired','lastDay','cutoffFrom','cutoffTo','monthly','daily','unpaidDays','silDays','vlDays','thirteenth','otherPay','deMinimis','sepBase','dSSS','dPHIC','dHDMF','dLoans','dTax','dAssets','dOther','remarks']
+  ['empName','empId','empPos','resignDate','dateHired','cutoffFrom','cutoffTo','monthly','daily','unpaidDays','silDays','vlDays','thirteenth','otherPay','deMinimis','sepBase','dSSS','dPHIC','dHDMF','dLoans','dTax','dAssets','dOther','remarks']
     .forEach(f=>$(f).value='');
   PREMS.forEach(([id])=>{if($(id))$(id).value='';});
   $('reason').selectedIndex=0;$('factor').selectedIndex=0;
@@ -1077,7 +1076,7 @@ $('daily').addEventListener('input',()=>{userTouchedDaily=true;compute();});
 $('factor').addEventListener('change',()=>{userTouchedDaily=($('factor').value==='0');compute();});
 $('reason').addEventListener('change',()=>{userTouchedSepRate=false;compute();});
 $('signatory').addEventListener('change',compute);
-['empName','empId','empPos','resignDate','dateHired','lastDay','cutoffFrom','cutoffTo','monthly','daily','unpaidDays','silDays','vlDays','thirteenth','otherPay','deMinimis','sepYears','sepBase','dSSS','dPHIC','dHDMF','dLoans','dTax','dAssets','dOther','remarks']
+['empName','empId','empPos','resignDate','dateHired','cutoffFrom','cutoffTo','monthly','daily','unpaidDays','silDays','vlDays','thirteenth','otherPay','deMinimis','sepYears','sepBase','dSSS','dPHIC','dHDMF','dLoans','dTax','dAssets','dOther','remarks']
   .forEach(f=>$(f).addEventListener('input',compute));
 PREMS.forEach(([id])=>$(id).addEventListener('input',compute));
 
