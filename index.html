@@ -211,6 +211,7 @@
           </select>
         </div>
         <div class="field"><label>Daily Rate</label><input id="daily" type="number" min="0" step="0.01" placeholder="auto"><div class="hint" id="dailyHint">= Monthly × 12 ÷ factor</div></div>
+        <div class="field"><label>Hourly Rate (8 hrs/day)</label><input id="hourly" type="number" readonly placeholder="auto"><div class="hint">= Daily Rate ÷ 8</div></div>
       </div>
     </div>
 
@@ -701,6 +702,7 @@ function compute(){
   $('dailyHint').textContent=factor>0?`Monthly ÷ ${(factor/12).toFixed(2)} days`:'custom rate';
   if(factor>0&&!userTouchedDaily)$('daily').value=monthly>0?(monthly*12/factor).toFixed(2):'';
   const daily=num('daily');
+  $('hourly').value=daily>0?(daily/8).toFixed(2):'';
   const los=yearsOfService();$('losText').value=los.text;
   if(!userTouchedSepBase)$('sepBase').value=monthly>0?monthly.toFixed(2):'';
   const reason=$('reason').value;
