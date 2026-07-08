@@ -351,25 +351,52 @@ async function showApp(session){
 /* ================= ACCESS MANAGEMENT (admin) ================= */
 async function openAccess(){ $('accessModal').style.display='flex'; await loadAccess(); }
 function roleLabel(r){return r==='admin'?'Admin':r==='staff'?'Payroll Staff':r;}
+let ACCESS_ROWS=[];
 async function loadAccess(){
-  const{data,error}=await sb.from('fp_access').select('*').order('role').order('email');
+  const{data,error}=await sb.from('fp_access').select('*').order('role').order('full_name');
   if(error){$('accessList').innerHTML='<p class="hint" style="color:var(--neg)">'+error.message+'</p>';return;}
-  $('accessList').innerHTML=(data||[]).map(a=>{
+  ACCESS_ROWS=data||[];
+  $('accessList').innerHTML=ACCESS_ROWS.map(a=>{
     const you=a.email.toLowerCase()===CURRENT_EMAIL.toLowerCase();
+    const em=a.email.replace(/'/g,"\\'");
     const badge=`<span style="background:${a.role==='admin'?'#b02a2a':'#0a7d3c'};color:#fff;border-radius:20px;padding:1px 8px;font-size:10px;font-weight:700;margin-left:6px">${roleLabel(a.role)}</span>`;
-    return `<div class="row-money"><span>${a.email}${you?' <b>(you)</b>':''}${badge}</span>
-      <button onclick="removeUser('${a.email.replace(/'/g,"\\'")}')" style="border:none;background:#eef0f3;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;color:var(--neg)">Remove</button></div>`;
+    return `<div style="padding:8px 0;border-bottom:1px dashed var(--line);display:flex;justify-content:space-between;align-items:center;gap:8px">
+      <span style="min-width:0">
+        <b>${a.full_name||'(no name)'}</b>${you?' <span class="hint" style="display:inline">(you)</span>':''}${badge}
+        <div class="hint" style="margin:2px 0 0">${a.email}</div>
+      </span>
+      <span style="white-space:nowrap">
+        <button onclick="editUser('${em}')" style="border:none;background:#eef0f3;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;color:var(--ink)">Edit</button>
+        <button onclick="removeUser('${em}')" style="border:none;background:#fdecec;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;color:var(--neg)">Remove</button>
+      </span></div>`;
   }).join('')||'<p class="hint">No users yet.</p>';
 }
-async function addAdmin(){ // grant access, choosing a role
-  const email=prompt('Grant access to which @meatplus.ph email?');
+function normRole(r){return (r||'').trim().toLowerCase()==='admin'?'admin':'staff';}
+async function addAdmin(){ // grant access
+  const email=prompt('Email address (@meatplus.ph):');
   if(!email)return;
   if(!/@meatplus\.ph$/i.test(email.trim())){alert('Must be a @meatplus.ph email address.');return;}
-  const r=prompt('Role for '+email.trim()+'?\nType "admin" (full control + user management)\nor "staff" (Payroll Staff / Encoder — compute, save, upload).','staff');
+  const name=prompt('Full name of the person:');
+  if(name===null)return;
+  const r=prompt('Role — type "admin" (full control + user management) or "staff" (Payroll Staff / Encoder).','staff');
   if(r===null)return;
-  const role=r.trim().toLowerCase()==='admin'?'admin':'staff';
-  const{error}=await sb.from('fp_access').upsert({email:email.trim().toLowerCase(),role},{onConflict:'email'});
+  const{error}=await sb.from('fp_access').upsert(
+    {email:email.trim().toLowerCase(),full_name:name.trim(),role:normRole(r)},{onConflict:'email'});
   if(error){alert(error.message);return;}
+  loadAccess();
+}
+async function editUser(email){
+  const u=ACCESS_ROWS.find(a=>a.email.toLowerCase()===email.toLowerCase())||{};
+  const name=prompt('Full name:',u.full_name||'');
+  if(name===null)return;
+  const r=prompt('Role — "admin" or "staff":',u.role||'staff');
+  if(r===null)return;
+  const role=normRole(r);
+  const you=email.toLowerCase()===CURRENT_EMAIL.toLowerCase();
+  if(you && role!=='admin' && !confirm('Change your OWN role to Payroll Staff? You will lose user-management access.'))return;
+  const{error}=await sb.from('fp_access').update({full_name:name.trim(),role}).ilike('email',email);
+  if(error){alert(error.message);return;}
+  if(you && role!=='admin'){await showApp((await sb.auth.getSession()).data.session);return;}
   loadAccess();
 }
 async function removeUser(email){
