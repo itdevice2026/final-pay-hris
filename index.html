@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Final Pay HRIS — Meat Plus</title>
+<style>
+  :root{--bg:#f4f6f8;--card:#fff;--ink:#1f2a37;--muted:#6b7280;--line:#e5e7eb;
+    --brand:#b02a2a;--brand2:#8f1f1f;--pos:#0a7d3c;--neg:#b02a2a;--accent:#fef6f6;}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg);color:var(--ink);font-size:14px;line-height:1.45}
+  /* ---- auth ---- */
+  #auth{position:fixed;inset:0;background:linear-gradient(135deg,#b02a2a,#5f1414);
+    display:flex;align-items:center;justify-content:center;z-index:50;padding:20px}
+  .authbox{background:#fff;border-radius:16px;padding:30px;width:100%;max-width:380px;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+  .authbox h1{margin:0 0 4px;font-size:20px;color:var(--brand)}
+  .authbox p{margin:0 0 18px;color:var(--muted);font-size:12.5px}
+  .authbox label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:10px 0 4px}
+  .authbox input{width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;font-size:14px}
+  .authbox button{width:100%;padding:11px;border:none;border-radius:8px;font-weight:700;font-size:14px;cursor:pointer;margin-top:14px}
+  .authbox .primary{background:var(--brand);color:#fff}
+  .authbox .link{background:none;color:var(--brand);margin-top:8px;font-size:12.5px;padding:4px}
+  #authMsg{margin-top:12px;font-size:12.5px;min-height:16px}
+  #authMsg.err{color:var(--neg)} #authMsg.ok{color:var(--pos)}
+  /* ---- app ---- */
+  #appwrap{display:none}
+  header{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;padding:14px 20px;
+    display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+  header h1{margin:0;font-size:18px}
+  header p{margin:2px 0 0;font-size:11.5px;opacity:.9}
+  .coy-pick{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .coy-pick select{padding:8px 10px;border-radius:8px;border:none;font-size:14px;font-weight:600;min-width:170px}
+  .coy-pick button,.who button{background:rgba(255,255,255,.18);color:#fff;border:1px solid rgba(255,255,255,.4);
+    border-radius:8px;padding:8px 10px;cursor:pointer;font-size:12px;font-weight:600}
+  .who{display:flex;align-items:center;gap:8px;font-size:12px}
+  .wrap{max-width:1080px;margin:0 auto;padding:20px;display:grid;grid-template-columns:1fr 400px;gap:20px}
+  @media(max-width:900px){.wrap{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:16px}
+  .card h2{margin:0 0 4px;font-size:15px;display:flex;align-items:center;gap:8px}
+  .card .sub{color:var(--muted);font-size:12px;margin:0 0 14px}
+  .badge{background:var(--brand);color:#fff;width:22px;height:22px;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:700}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .grid.three{grid-template-columns:1fr 1fr 1fr}
+  @media(max-width:560px){.grid,.grid.three{grid-template-columns:1fr}}
+  label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;font-weight:600}
+  input,select{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:8px;font-size:14px;font-family:inherit;background:#fff;color:var(--ink)}
+  input:focus,select:focus{outline:none;border-color:var(--brand)}
+  input[readonly]{background:#f6f7f9;color:var(--muted)}
+  .field{margin-bottom:12px}
+  .hint{font-size:11px;color:var(--muted);margin-top:3px}
+  .row-money{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px dashed var(--line);font-size:13px}
+  .row-money:last-child{border-bottom:none}
+  .row-money b{font-variant-numeric:tabular-nums}
+  .summary{position:sticky;top:16px}
+  .sumhead{font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:0 0 8px}
+  .sumgroup{margin-bottom:14px}
+  .sumgroup h3{margin:0 0 6px;font-size:12.5px;color:var(--brand);text-transform:uppercase;letter-spacing:.03em}
+  .net{background:var(--brand);color:#fff;border-radius:12px;padding:16px;text-align:center;margin-top:6px}
+  .net small{display:block;font-size:11px;opacity:.85;text-transform:uppercase;letter-spacing:.05em}
+  .net .amt{font-size:30px;font-weight:800;margin-top:4px;font-variant-numeric:tabular-nums}
+  .pos{color:var(--pos)} .neg{color:var(--neg)}
+  .btns{display:flex;gap:8px;margin-top:12px}
+  button.act{flex:1;padding:11px;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer}
+  .btn-print{background:var(--brand);color:#fff}.btn-reset{background:#eef0f3;color:var(--ink)}.btn-save{background:#0a7d3c;color:#fff}
+  .note{background:var(--accent);border:1px solid #f3d6d6;border-radius:8px;padding:10px 12px;font-size:11.5px;color:#7a2020;margin-top:10px}
+  .totline{display:flex;justify-content:space-between;font-weight:700;padding-top:8px;margin-top:4px;border-top:2px solid var(--line)}
+  #payslip{display:none}
+  @media print{body{background:#fff}header,.inputs,.btns{display:none!important}.wrap{display:block;max-width:100%;padding:0}#payslip{display:block}#appwrap{display:block!important}}
+</style>
+</head>
+<body>
+
+<!-- ================= LOGIN ================= -->
+<div id="auth">
+  <div class="authbox">
+    <h1>Final Pay HRIS</h1>
+    <p>Meat Plus payroll. Sign in with your <b>@meatplus.ph</b> email.</p>
+    <label>Email</label><input id="auEmail" type="email" placeholder="you@meatplus.ph" autocomplete="username">
+    <label>Password</label><input id="auPass" type="password" placeholder="••••••••" autocomplete="current-password">
+    <button class="primary" id="btnSignIn">Sign in</button>
+    <button class="link" id="btnSignUp">New here? Create an account</button>
+    <div id="authMsg"></div>
+  </div>
+</div>
+
+<!-- ================= APP ================= -->
+<div id="appwrap">
+<header>
+  <div>
+    <h1>Final Pay Calculator</h1>
+    <p>Cloud HRIS &middot; DOLE Labor Advisory 06-20</p>
+  </div>
+  <div class="coy-pick">
+    <select id="company" title="Active company"></select>
+    <button onclick="addCompany()">+ Add</button>
+    <button onclick="editCompany()">✎ Edit</button>
+    <button onclick="removeCompany()">Remove</button>
+  </div>
+  <div class="who">
+    <span id="whoami"></span>
+    <button onclick="signOut()">Sign out</button>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="inputs">
+    <div class="card">
+      <h2><span class="badge">i</span> Employee Details</h2>
+      <p class="sub">Basic information for the payslip record.</p>
+      <div class="grid">
+        <div class="field">
+          <label style="display:flex;justify-content:space-between;align-items:center">
+            <span>Employee Name</span>
+            <span>
+              <button type="button" onclick="document.getElementById('nameFile').click()" style="background:#eef0f3;border:none;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:700;cursor:pointer;color:var(--ink)">⬆ Upload list</button>
+              <span id="nameCount" class="hint" style="margin:0"></span>
+            </span>
+          </label>
+          <select id="empPick" style="margin-bottom:6px;display:none"></select>
+          <input id="empName" list="empNames" placeholder="Type name (or pick from list above)">
+          <datalist id="empNames"></datalist>
+          <input id="nameFile" type="file" accept=".csv,.txt,.xlsx,.xls" style="display:none">
+          <div class="hint">Upload CSV/Excel with columns Name, Date, Company (auto-detected). Saved to the cloud roster.</div>
+        </div>
+        <div class="field"><label>Employee ID</label><input id="empId" placeholder="EMP-0001"></div>
+        <div class="field"><label>Position / Department</label><input id="empPos" placeholder="Warehouse Staff"></div>
+        <div class="field"><label>Reason for Separation</label>
+          <select id="reason">
+            <option value="resign">Resignation (voluntary)</option>
+            <option value="eoc">End of Contract / Project completion</option>
+            <option value="justcause">Termination for just cause</option>
+            <option value="retire">Retirement</option>
+            <option value="redundancy">Redundancy</option>
+            <option value="laborsaving">Installation of labor-saving devices</option>
+            <option value="retrench">Retrenchment (to prevent losses)</option>
+            <option value="closure">Closure NOT due to serious losses</option>
+            <option value="closurelosses">Closure DUE to serious losses</option>
+            <option value="illness">Disease / health grounds</option>
+          </select>
+        </div>
+        <div class="field"><label>Date of Resignation / Submitted</label><input id="resignDate" type="date"></div>
+        <div class="field"><label>Date Hired</label><input id="dateHired" type="date"></div>
+        <div class="field"><label>Last Day Worked</label><input id="lastDay" type="date"></div>
+      </div>
+      <div class="field"><label>Length of Service (auto)</label><input id="losText" readonly value="—"></div>
+    </div>
+
+    <div class="card">
+      <h2><span class="badge">₱</span> Salary Basis</h2>
+      <p class="sub">Daily rate = Monthly &divide; days-per-month. Default is &divide; 22.</p>
+      <div class="grid three">
+        <div class="field"><label>Monthly Basic Salary</label><input id="monthly" type="number" min="0" step="0.01" placeholder="30000"></div>
+        <div class="field"><label>Rate Basis (days / month)</label>
+          <select id="factor">
+            <option value="264">÷ 22 days / month</option>
+            <option value="313">÷ 26.08 (313/yr)</option>
+            <option value="261">÷ 21.75 (261/yr)</option>
+            <option value="365">÷ 30.42 (365/yr)</option>
+            <option value="0">Custom daily rate →</option>
+          </select>
+        </div>
+        <div class="field"><label>Daily Rate</label><input id="daily" type="number" min="0" step="0.01" placeholder="auto"><div class="hint" id="dailyHint">= Monthly × 12 ÷ factor</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2><span class="badge">A</span> Earnings Due</h2>
+      <p class="sub">Standard components of final pay.</p>
+      <div class="grid">
+        <div class="field"><label>Days worked (unpaid)</label><input id="unpaidDays" type="number" min="0" step="0.5" placeholder="15"></div>
+        <div class="field"><label>Unused SIL — days</label><input id="silDays" type="number" min="0" step="0.5" placeholder="5"></div>
+        <div class="field"><label>Unused VL — days</label><input id="vlDays" type="number" min="0" step="0.5" placeholder="3"></div>
+        <div class="field"><label>13th Month Pay Due (₱)</label><input id="thirteenth" type="number" min="0" step="0.01" placeholder="17500"><div class="hint">Enter amount, or use ⚙ to pro-rate.</div></div>
+        <div class="field"><label>Other unpaid pay (OT, holiday, allowances)</label><input id="otherPay" type="number" min="0" step="0.01" placeholder="0"></div>
+      </div>
+      <button class="act" style="flex:0;padding:7px 12px;background:#eef0f3;color:var(--ink);font-size:12px" onclick="prorate13th()">⚙ Pro-rate 13th from YTD basic</button>
+    </div>
+
+    <div class="card">
+      <h2><span class="badge">B</span> Separation Pay</h2>
+      <p class="sub" id="sepNote">Auto-set from the separation reason. Editable.</p>
+      <div class="grid three">
+        <div class="field"><label>Rate</label>
+          <select id="sepRate"><option value="0">None</option><option value="1">1 month pay / year</option><option value="0.5">½ month pay / year</option></select>
+        </div>
+        <div class="field"><label>Years of service (≥6 mo = 1 yr)</label><input id="sepYears" type="number" min="0" step="1" placeholder="0"></div>
+        <div class="field"><label>Monthly pay base</label><input id="sepBase" type="number" min="0" step="0.01" placeholder="= monthly basic"></div>
+      </div>
+      <div class="hint">Minimum guarantee: at least one (1) month pay when separation pay applies.</div>
+    </div>
+
+    <div class="card">
+      <h2><span class="badge">C</span> Deductions</h2>
+      <p class="sub">Government contributions, tax, loans, and accountabilities.</p>
+      <div class="grid three">
+        <div class="field"><label>SSS (final)</label><input id="dSSS" type="number" min="0" step="0.01" placeholder="0"></div>
+        <div class="field"><label>PhilHealth (final)</label><input id="dPHIC" type="number" min="0" step="0.01" placeholder="0"></div>
+        <div class="field"><label>Pag-IBIG (final)</label><input id="dHDMF" type="number" min="0" step="0.01" placeholder="0"></div>
+      </div>
+      <div class="grid">
+        <div class="field"><label>Salary loan / cash advance</label><input id="dLoans" type="number" min="0" step="0.01" placeholder="5000"></div>
+        <div class="field"><label>Withholding tax adjustment</label><input id="dTax" type="number" step="0.01" placeholder="0"><div class="hint">Negative = tax refund.</div></div>
+        <div class="field"><label>Unreturned assets / accountabilities</label><input id="dAssets" type="number" min="0" step="0.01" placeholder="0"></div>
+        <div class="field"><label>Other deductions</label><input id="dOther" type="number" min="0" step="0.01" placeholder="0"></div>
+      </div>
+      <div class="note">Tax reminders: 13th-month &amp; other benefits are tax-exempt up to ₱90,000. Separation pay from redundancy, retrenchment, closure, or illness (beyond the employee's control) is tax-exempt. Verify the annualized withholding with your accountant.</div>
+    </div>
+  </div>
+
+  <div class="summary">
+    <div class="card">
+      <p class="sumhead">Computation Summary</p>
+      <div class="sumgroup">
+        <h3>Earnings</h3>
+        <div class="row-money"><span>Salary (worked days)</span><b id="o_unpaid">₱0.00</b></div>
+        <div class="row-money"><span>Unused SIL</span><b id="o_sil">₱0.00</b></div>
+        <div class="row-money"><span>Unused VL</span><b id="o_vl">₱0.00</b></div>
+        <div class="row-money"><span>13th month pay</span><b id="o_13th">₱0.00</b></div>
+        <div class="row-money"><span>Other pay</span><b id="o_other">₱0.00</b></div>
+        <div class="row-money"><span>Separation pay</span><b id="o_sep">₱0.00</b></div>
+        <div class="totline"><span>Total Earnings</span><b id="o_gross" class="pos">₱0.00</b></div>
+      </div>
+      <div class="sumgroup">
+        <h3>Deductions</h3>
+        <div class="row-money"><span>SSS / PhilHealth / Pag-IBIG</span><b id="o_gov">₱0.00</b></div>
+        <div class="row-money"><span>Salary loan / advance</span><b id="o_loans">₱0.00</b></div>
+        <div class="row-money"><span>Withholding tax</span><b id="o_tax">₱0.00</b></div>
+        <div class="row-money"><span>Assets &amp; other</span><b id="o_acct">₱0.00</b></div>
+        <div class="totline"><span>Total Deductions</span><b id="o_ded" class="neg">₱0.00</b></div>
+      </div>
+      <div class="net"><small>Net Final Pay</small><div class="amt" id="o_net">₱0.00</div></div>
+      <div class="btns">
+        <button class="act btn-save" onclick="saveRecord()">Save to cloud</button>
+        <button class="act btn-print" onclick="window.print()">Print</button>
+        <button class="act btn-reset" onclick="resetForm()">Clear</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="payslip">
+  <div style="max-width:720px;margin:0 auto;padding:30px;font-size:13px">
+    <h2 style="margin:0;text-align:center" id="p_company">COMPANY</h2>
+    <p id="p_coyinfo" style="text-align:center;color:#666;margin:2px 0 0;font-size:11px"></p>
+    <p style="text-align:center;font-weight:700;margin:6px 0 2px">FINAL PAY / BACK-PAY COMPUTATION</p>
+    <p style="text-align:center;color:#666;margin:0 0 18px;font-size:11px">Guided by DOLE Labor Advisory No. 06, s. 2020</p>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:16px">
+      <tr><td style="padding:3px 0"><b>Employee:</b> <span id="p_name"></span></td><td style="padding:3px 0"><b>ID:</b> <span id="p_id"></span></td></tr>
+      <tr><td style="padding:3px 0"><b>Position:</b> <span id="p_pos"></span></td><td style="padding:3px 0"><b>Reason:</b> <span id="p_reason"></span></td></tr>
+      <tr><td style="padding:3px 0"><b>Date Hired:</b> <span id="p_hired"></span></td><td style="padding:3px 0"><b>Last Day:</b> <span id="p_last"></span></td></tr>
+      <tr><td style="padding:3px 0" colspan="2"><b>Length of Service:</b> <span id="p_los"></span> &middot; <b>Monthly:</b> <span id="p_monthly"></span> &middot; <b>Daily:</b> <span id="p_daily"></span></td></tr>
+    </table>
+    <table style="width:100%;border-collapse:collapse" id="p_table"></table>
+    <p style="margin-top:40px;color:#666">Prepared by: ___________________________ &nbsp;&nbsp;&nbsp; Received by: ___________________________</p>
+    <p style="color:#999;font-size:10px">Generated <span id="p_date"></span>. Working document; verify statutory deductions and tax with your accountant.</p>
+  </div>
+</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+/* ===== Supabase config ===== */
+const SUPABASE_URL='https://emkcwukiqxnvcbhkjiqz.supabase.co';
+const SUPABASE_KEY='sb_publishable_u_qnmEI8oHI9Z_A0-Hht3Q_Yvaa7Ork';
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+
+const $=id=>document.getElementById(id);
+const num=id=>parseFloat($(id).value)||0;
+const peso=n=>'₱'+(n||0).toLocaleString('en-PH',{minimumFractionDigits:2,maximumFractionDigits:2});
+
+let COMPANIES=[], ROSTER=[], LAST={};
+let userTouchedSepRate=false,userTouchedSepBase=false,userTouchedDaily=false;
+
+const REASON_RATE={resign:0,eoc:0,justcause:0,retire:0,illness:0.5,redundancy:1,laborsaving:1,retrench:0.5,closure:0.5,closurelosses:0};
+const REASON_LABEL={resign:'Resignation',eoc:'End of Contract',justcause:'Termination for just cause',retire:'Retirement',illness:'Disease / health grounds',redundancy:'Redundancy',laborsaving:'Installation of labor-saving devices',retrench:'Retrenchment',closure:'Closure not due to serious losses',closurelosses:'Closure due to serious losses'};
+
+/* ================= AUTH ================= */
+function setMsg(t,cls){const m=$('authMsg');m.textContent=t;m.className=cls||'';}
+$('btnSignIn').onclick=async()=>{
+  const email=$('auEmail').value.trim(),password=$('auPass').value;
+  if(!email||!password){setMsg('Enter email and password.','err');return;}
+  setMsg('Signing in…');
+  const{error}=await sb.auth.signInWithPassword({email,password});
+  if(error)setMsg(error.message,'err');
+};
+$('btnSignUp').onclick=async()=>{
+  const email=$('auEmail').value.trim(),password=$('auPass').value;
+  if(!email||!password){setMsg('Enter email and a password (min 6 chars).','err');return;}
+  if(!/@meatplus\.ph$/i.test(email)){setMsg('Use your @meatplus.ph company email.','err');return;}
+  setMsg('Creating account…');
+  const{data,error}=await sb.auth.signUp({email,password});
+  if(error){setMsg(error.message,'err');return;}
+  if(data.session){setMsg('Account created. Loading…','ok');}
+  else setMsg('Account created. Check your email to confirm, then sign in.','ok');
+};
+async function signOut(){await sb.auth.signOut();}
+sb.auth.onAuthStateChange((_e,session)=>{ session?showApp(session):showAuth(); });
+function showAuth(){$('auth').style.display='flex';$('appwrap').style.display='none';}
+async function showApp(session){
+  $('auth').style.display='none';$('appwrap').style.display='block';
+  $('whoami').textContent=session.user.email;
+  await loadCompanies(); await loadRoster(); compute();
+}
+
+/* ================= COMPANIES (cloud) ================= */
+async function loadCompanies(sel){
+  const{data,error}=await sb.from('fp_companies').select('*').order('name');
+  if(error){console.error(error);return;}
+  COMPANIES=data||[];
+  if(!COMPANIES.length){ // ensure at least one
+    await sb.from('fp_companies').insert({name:'Meat Plus'});
+    return loadCompanies(sel);
+  }
+  const keep=sel||$('company').value;
+  $('company').innerHTML=COMPANIES.map(c=>`<option>${c.name}</option>`).join('');
+  if(keep&&COMPANIES.some(c=>c.name===keep))$('company').value=keep;
+  applyCompanyDefaults();
+}
+function currentCompany(){return COMPANIES.find(c=>c.name===$('company').value)||COMPANIES[0]||{};}
+function applyCompanyDefaults(){
+  const c=currentCompany();
+  if(c&&c.factor&&!userTouchedDaily&&[...$('factor').options].some(o=>o.value==String(c.factor)))
+    $('factor').value=String(c.factor);
+}
+async function addCompany(){
+  const name=prompt('New company name:');if(!name)return;
+  const{error}=await sb.from('fp_companies').insert({name:name.trim(),factor:264});
+  if(error){alert(error.message);return;}
+  await loadCompanies(name.trim());renderRoster();compute();editCompany();
+}
+async function editCompany(){
+  const c=currentCompany();if(!c.id)return;
+  const name=prompt('Company name:',c.name);if(name===null)return;
+  const address=prompt('Company address (shown on payslip):',c.address||'');
+  const tin=prompt('TIN / registration no.:',c.tin||'');
+  const factor=prompt('Default rate basis (days/year): 264=÷22, 313, 261, 365',c.factor||264);
+  const{error}=await sb.from('fp_companies').update({
+    name:(name.trim()||c.name),address:(address||'').trim(),tin:(tin||'').trim(),factor:parseInt(factor)||c.factor
+  }).eq('id',c.id);
+  if(error){alert(error.message);return;}
+  await loadCompanies(name.trim()||c.name);renderRoster();compute();
+}
+async function removeCompany(){
+  const c=currentCompany();
+  if(COMPANIES.length<=1){alert('Keep at least one company.');return;}
+  if(!confirm('Remove company "'+c.name+'"? Saved pay records are kept but roster links are cleared.'))return;
+  const{error}=await sb.from('fp_companies').delete().eq('id',c.id);
+  if(error){alert(error.message);return;}
+  await loadCompanies();renderRoster();compute();
+}
+
+/* ================= ROSTER (cloud) ================= */
+async function loadRoster(){
+  const{data,error}=await sb.from('fp_employees').select('*').order('name');
+  if(error){console.error(error);return;}
+  ROSTER=data||[]; renderRoster();
+}
+function rosterForActive(){
+  const cur=$('company').value;
+  const tagged=ROSTER.filter(e=>e.company_name===cur);
+  return tagged.length?tagged:ROSTER;
+}
+function renderRoster(){
+  const list=rosterForActive(),sel=$('empPick');
+  $('empNames').innerHTML=list.map(e=>`<option value="${(e.name||'').replace(/"/g,'&quot;')}">`).join('');
+  $('nameCount').textContent=ROSTER.length?`(${ROSTER.length} in roster)`:'';
+  if(list.length){
+    sel.style.display='block';
+    sel.innerHTML='<option value="">— pick employee ('+list.length+') —</option>'+
+      list.map((e,i)=>`<option value="${i}">${e.name}${e.resign_date?' · '+e.resign_date:''}${e.company_name&&e.company_name!==$('company').value?' · '+e.company_name:''}</option>`).join('');
+  }else{sel.style.display='none';sel.innerHTML='';}
+}
+$('empPick').addEventListener('change',function(){
+  if(this.value==='')return;
+  const e=rosterForActive()[parseInt(this.value)];if(!e)return;
+  $('empName').value=e.name||'';
+  if(e.resign_date)$('resignDate').value=e.resign_date;
+  if(e.position)$('empPos').value=e.position;
+  if(e.emp_code)$('empId').value=e.emp_code;
+  if(e.company_name&&COMPANIES.some(c=>c.name===e.company_name)&&e.company_name!==$('company').value){
+    $('company').value=e.company_name;applyCompanyDefaults();
+  }
+  compute();
+});
+
+/* ---- upload parsing ---- */
+function classify(h){h=String(h||'').toLowerCase();
+  if(/(company|entity|branch|business\s*unit|employer)/.test(h))return'company';
+  if(/(date|resign|submit|effectiv|separation|last\s*day)/.test(h))return'date';
+  if(/(name|employee|pangalan)/.test(h))return'name';return null;}
+function toISO(v){if(v==null||v==='')return null;
+  if(v instanceof Date&&!isNaN(v))return v.getFullYear()+'-'+String(v.getMonth()+1).padStart(2,'0')+'-'+String(v.getDate()).padStart(2,'0');
+  const s=String(v).trim();let m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if(m)return `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
+  m=s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+  if(m){let mo=m[1],da=m[2],yr=m[3];if(yr.length===2)yr='20'+yr;return `${yr}-${mo.padStart(2,'0')}-${da.padStart(2,'0')}`;}
+  const d=new Date(s);if(!isNaN(d))return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  return null;}
+function extractRoster(rows){
+  rows=rows.filter(r=>r&&r.some(c=>String(c||'').trim()!==''));if(!rows.length)return[];
+  const first=rows[0].map(c=>String(c||'').trim());const map={};let hasHeader=false;
+  first.forEach((h,i)=>{const t=classify(h);if(t&&map[t]===undefined){map[t]=i;hasHeader=true;}});
+  let ci={name:0,date:1,company:2},start=0;
+  if(hasHeader){ci={name:map.name??0,date:map.date??-1,company:map.company??-1};start=1;}
+  const out=[];
+  for(let i=start;i<rows.length;i++){const r=rows[i];
+    const name=String(r[ci.name]||'').trim().replace(/^"|"$/g,'');
+    if(!name||/^(name|employee|no\.?|#|id)$/i.test(name))continue;
+    out.push({name,resign_date:ci.date>=0?toISO(r[ci.date]):null,
+      company_name:ci.company>=0?String(r[ci.company]||'').trim():$('company').value});}
+  return out;
+}
+function parseCSV(text){return text.split(/\r?\n/).map(line=>line.split(/[,\t;]/).map(c=>c.trim().replace(/^"|"$/g,'')));}
+async function importRecs(recs){
+  if(!recs.length){alert('No employees detected. Use columns Name, Date, Company (Name required).');return;}
+  // register new companies
+  const existing=new Set(COMPANIES.map(c=>c.name));
+  const newCoys=[...new Set(recs.map(r=>r.company_name).filter(n=>n&&!existing.has(n)))];
+  if(newCoys.length)await sb.from('fp_companies').insert(newCoys.map(n=>({name:n,factor:264})));
+  // upsert employees
+  const{error}=await sb.from('fp_employees').upsert(
+    recs.map(r=>({name:r.name,resign_date:r.resign_date,company_name:r.company_name})),
+    {onConflict:'name,company_name'});
+  if(error){alert('Import error: '+error.message);return;}
+  await loadCompanies($('company').value);await loadRoster();compute();
+  const wd=recs.filter(r=>r.resign_date).length;
+  alert(recs.length+' employee(s) imported to the cloud roster.\nDates captured: '+wd+'.\nUse the "pick employee" dropdown to select one.');
+}
+$('nameFile').addEventListener('change',function(){
+  const f=this.files[0];if(!f)return;const ext=f.name.split('.').pop().toLowerCase();
+  if(ext==='csv'||ext==='txt'){const r=new FileReader();r.onload=e=>importRecs(extractRoster(parseCSV(e.target.result)));r.readAsText(f);}
+  else{const r=new FileReader();r.onload=e=>{try{
+    const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array',cellDates:true});
+    const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:'',raw:true});
+    importRecs(extractRoster(rows));
+  }catch(err){alert('Could not read that Excel file. Save it as CSV and try again.');}};r.readAsArrayBuffer(f);}
+  this.value='';
+});
+
+/* ================= COMPUTE ================= */
+function yearsOfService(){
+  const h=$('dateHired').value,l=$('lastDay').value;if(!h||!l)return{yrs:0,text:'—'};
+  const d1=new Date(h),d2=new Date(l);if(d2<d1)return{yrs:0,text:'invalid dates'};
+  let months=(d2.getFullYear()-d1.getFullYear())*12+(d2.getMonth()-d1.getMonth());
+  if(d2.getDate()<d1.getDate())months-=1;months=Math.max(0,months);
+  const y=Math.floor(months/12),m=months%12;return{yrs:y+(m>=6?1:0),text:`${y} yr ${m} mo`};
+}
+function prorate13th(){const v=prompt('Total BASIC salary earned this calendar year (Jan 1 → last day):');
+  if(v===null)return;$('thirteenth').value=((parseFloat(v)||0)/12).toFixed(2);compute();}
+function compute(){
+  const factor=parseFloat($('factor').value),monthly=num('monthly');
+  $('dailyHint').textContent=factor>0?`Monthly ÷ ${(factor/12).toFixed(2)} days`:'custom rate';
+  if(factor>0&&!userTouchedDaily)$('daily').value=monthly>0?(monthly*12/factor).toFixed(2):'';
+  const daily=num('daily');
+  const los=yearsOfService();$('losText').value=los.text;
+  if(!userTouchedSepBase)$('sepBase').value=monthly>0?monthly.toFixed(2):'';
+  const reason=$('reason').value;
+  if(!userTouchedSepRate)$('sepRate').value=String(REASON_RATE[reason]);
+  $('sepYears').value=los.yrs;
+  const salary=num('unpaidDays')*daily,sil=num('silDays')*daily,vl=num('vlDays')*daily,thir=num('thirteenth'),other=num('otherPay');
+  const sepRate=parseFloat($('sepRate').value)||0,sepBase=num('sepBase'),sepYears=num('sepYears');
+  let sep=sepRate*sepBase*sepYears;if(sepRate>0&&sep<sepBase)sep=sepBase;if(sepRate===0)sep=0;
+  const gross=salary+sil+vl+thir+other+sep;
+  const gov=num('dSSS')+num('dPHIC')+num('dHDMF'),loans=num('dLoans'),tax=num('dTax'),acct=num('dAssets')+num('dOther');
+  const ded=gov+loans+tax+acct,net=gross-ded;
+  LAST={daily,salary,sil,vl,thir,other,sep,sepRate,sepBase,sepYears,gross,gov,loans,tax,acct,ded,net};
+  $('o_unpaid').textContent=peso(salary);$('o_sil').textContent=peso(sil);$('o_vl').textContent=peso(vl);
+  $('o_13th').textContent=peso(thir);$('o_other').textContent=peso(other);$('o_sep').textContent=peso(sep);
+  $('o_gross').textContent=peso(gross);$('o_gov').textContent=peso(gov);$('o_loans').textContent=peso(loans);
+  $('o_tax').textContent=peso(tax);$('o_acct').textContent=peso(acct);$('o_ded').textContent=peso(ded);$('o_net').textContent=peso(net);
+  $('sepNote').textContent=sepRate>0?`${REASON_LABEL[reason]}: ${sepRate===1?'1 month':'½ month'} pay × ${sepYears} yr, min. 1 month.`:`${REASON_LABEL[reason]}: no statutory separation pay (unless company policy provides).`;
+  const coy=currentCompany();
+  $('p_company').textContent=(coy&&coy.name)||'COMPANY';
+  $('p_coyinfo').textContent=[coy&&coy.address,coy&&coy.tin?('TIN: '+coy.tin):''].filter(Boolean).join(' · ');
+  $('p_name').textContent=$('empName').value||'—';$('p_id').textContent=$('empId').value||'—';
+  $('p_pos').textContent=$('empPos').value||'—';$('p_reason').textContent=REASON_LABEL[reason];
+  $('p_hired').textContent=$('dateHired').value||'—';$('p_last').textContent=$('lastDay').value||'—';
+  $('p_los').textContent=los.text;$('p_monthly').textContent=peso(monthly);$('p_daily').textContent=peso(daily);
+  $('p_date').textContent=new Date().toLocaleString('en-PH');
+  const rows=[['EARNINGS','',''],['Salary',`${num('unpaidDays')} day(s) × ${peso(daily)}`,salary],
+    ['Unused SIL',`${num('silDays')} day(s) × ${peso(daily)}`,sil],['Unused VL',`${num('vlDays')} day(s) × ${peso(daily)}`,vl],
+    ['13th month pay','',thir],['Other pay','OT / holiday / allowances',other],
+    ['Separation pay',sepRate>0?`${sepRate===1?'1':'½'} mo × ${sepYears} yr × ${peso(sepBase)}`:'—',sep],
+    ['Total Earnings','',gross,'tot'],['DEDUCTIONS','',''],['SSS / PhilHealth / Pag-IBIG','',gov],
+    ['Salary loan / advance','',loans],['Withholding tax','',tax],['Assets & other','',acct],
+    ['Total Deductions','',ded,'tot'],['NET FINAL PAY','',net,'net']];
+  $('p_table').innerHTML=rows.map(r=>{
+    if(r[2]===''&&r[1]==='')return `<tr><td colspan="3" style="padding:10px 0 4px;font-weight:700;border-bottom:2px solid #333">${r[0]}</td></tr>`;
+    const st=r[3]==='net'?'font-weight:800;font-size:15px;border-top:3px double #333':r[3]==='tot'?'font-weight:700;border-top:1px solid #333':'';
+    return `<tr style="${st}"><td style="padding:4px 0">${r[0]}</td><td style="padding:4px 8px;color:#666;font-size:11px">${r[1]}</td><td style="padding:4px 0;text-align:right;font-variant-numeric:tabular-nums">${peso(r[2])}</td></tr>`;
+  }).join('');
+}
+
+/* ================= SAVE / RESET ================= */
+async function saveRecord(){
+  const coy=currentCompany();
+  const rec={company_id:coy.id||null,company_name:coy.name||'',
+    emp_name:$('empName').value,emp_code:$('empId').value,position:$('empPos').value,reason:$('reason').value,
+    resign_date:$('resignDate').value||null,date_hired:$('dateHired').value||null,last_day:$('lastDay').value||null,
+    monthly:num('monthly'),factor:parseInt($('factor').value)||0,daily:LAST.daily,
+    days_worked:num('unpaidDays'),sil_days:num('silDays'),vl_days:num('vlDays'),
+    thirteenth:num('thirteenth'),other_pay:num('otherPay'),
+    sep_rate:LAST.sepRate,sep_years:LAST.sepYears,sep_base:LAST.sepBase,sep_pay:LAST.sep,
+    d_sss:num('dSSS'),d_phic:num('dPHIC'),d_hdmf:num('dHDMF'),d_loans:num('dLoans'),
+    d_tax:num('dTax'),d_assets:num('dAssets'),d_other:num('dOther'),
+    gross:LAST.gross,total_deductions:LAST.ded,net_pay:LAST.net};
+  if(!rec.emp_name){alert('Enter an employee name before saving.');return;}
+  const{error}=await sb.from('fp_records').insert(rec);
+  if(error){alert('Save failed: '+error.message);return;}
+  alert('Saved to cloud: '+rec.emp_name+' — Net '+peso(LAST.net));
+}
+function resetForm(){
+  if(!confirm('Clear all fields?'))return;
+  ['empName','empId','empPos','resignDate','dateHired','lastDay','monthly','daily','unpaidDays','silDays','vlDays','thirteenth','otherPay','sepBase','dSSS','dPHIC','dHDMF','dLoans','dTax','dAssets','dOther']
+    .forEach(f=>$(f).value='');
+  $('reason').selectedIndex=0;$('factor').selectedIndex=0;
+  userTouchedSepRate=userTouchedSepBase=userTouchedDaily=false;compute();
+}
+
+/* ================= WIRING ================= */
+$('company').addEventListener('change',()=>{applyCompanyDefaults();renderRoster();compute();});
+$('sepRate').addEventListener('change',()=>{userTouchedSepRate=true;compute();});
+$('sepBase').addEventListener('input',()=>{userTouchedSepBase=true;compute();});
+$('daily').addEventListener('input',()=>{userTouchedDaily=true;compute();});
+$('factor').addEventListener('change',()=>{userTouchedDaily=($('factor').value==='0');compute();});
+$('reason').addEventListener('change',()=>{userTouchedSepRate=false;compute();});
+['empName','empId','empPos','resignDate','dateHired','lastDay','monthly','daily','unpaidDays','silDays','vlDays','thirteenth','otherPay','sepYears','sepBase','dSSS','dPHIC','dHDMF','dLoans','dTax','dAssets','dOther']
+  .forEach(f=>$(f).addEventListener('input',compute));
+
+/* init: check existing session */
+sb.auth.getSession().then(({data})=>{data.session?showApp(data.session):showAuth();});
+</script>
+</body>
+</html>
