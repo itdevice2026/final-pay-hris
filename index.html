@@ -84,6 +84,28 @@
   </div>
 </div>
 
+<!-- ================= PENDING APPROVAL ================= -->
+<div id="pending" style="display:none;position:fixed;inset:0;background:linear-gradient(135deg,#b02a2a,#5f1414);z-index:50;align-items:center;justify-content:center;padding:20px">
+  <div class="authbox">
+    <h1>Access pending</h1>
+    <p>You're signed in as <b id="pendingEmail"></b>, but your account hasn't been granted access yet. Please ask an administrator to approve it, then sign in again.</p>
+    <button class="primary" onclick="signOut()">Sign out</button>
+  </div>
+</div>
+
+<!-- ================= MANAGE ACCESS (admin) ================= -->
+<div id="accessModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:60;align-items:center;justify-content:center;padding:20px">
+  <div class="card" style="width:100%;max-width:480px;margin:0">
+    <h2><span class="badge">🔑</span> Manage Access</h2>
+    <p class="sub">Only admins listed here can use the system. New sign-ups have no access until added.</p>
+    <div id="accessList"></div>
+    <div class="btns">
+      <button class="act btn-save" onclick="addAdmin()">+ Add admin</button>
+      <button class="act btn-reset" onclick="document.getElementById('accessModal').style.display='none'">Close</button>
+    </div>
+  </div>
+</div>
+
 <!-- ================= APP ================= -->
 <div id="appwrap">
 <header>
@@ -99,6 +121,7 @@
   </div>
   <div class="who">
     <span id="whoami"></span>
+    <button onclick="openAccess()">🔑 Manage Access</button>
     <button onclick="signOut()">Sign out</button>
   </div>
 </header>
@@ -297,11 +320,56 @@ $('btnSignUp').onclick=async()=>{
 };
 async function signOut(){await sb.auth.signOut();}
 sb.auth.onAuthStateChange((_e,session)=>{ session?showApp(session):showAuth(); });
-function showAuth(){$('auth').style.display='flex';$('appwrap').style.display='none';}
+function showAuth(){$('auth').style.display='flex';$('appwrap').style.display='none';$('pending').style.display='none';}
+
+let CURRENT_EMAIL='';
+async function isAdmin(email){
+  const{data}=await sb.from('fp_access').select('role').ilike('email',email).maybeSingle();
+  return !!(data && data.role==='admin');
+}
 async function showApp(session){
-  $('auth').style.display='none';$('appwrap').style.display='block';
+  CURRENT_EMAIL=session.user.email;
+  $('auth').style.display='none';
+  const admin=await isAdmin(CURRENT_EMAIL);
+  if(!admin){
+    $('appwrap').style.display='none';
+    $('pending').style.display='flex';
+    $('pendingEmail').textContent=CURRENT_EMAIL;
+    return;
+  }
+  $('pending').style.display='none';
+  $('appwrap').style.display='block';
   $('whoami').textContent=session.user.email;
   await loadCompanies(); await loadRoster(); compute();
+}
+
+/* ================= ACCESS MANAGEMENT (admin) ================= */
+async function openAccess(){ $('accessModal').style.display='flex'; await loadAccess(); }
+async function loadAccess(){
+  const{data,error}=await sb.from('fp_access').select('*').order('email');
+  if(error){$('accessList').innerHTML='<p class="hint" style="color:var(--neg)">'+error.message+'</p>';return;}
+  $('accessList').innerHTML=(data||[]).map(a=>{
+    const you=a.email.toLowerCase()===CURRENT_EMAIL.toLowerCase();
+    return `<div class="row-money"><span>${a.email}${you?' <b>(you)</b>':''}</span>
+      <button onclick="removeAdmin('${a.email.replace(/'/g,"\\'")}')" style="border:none;background:#eef0f3;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;color:var(--neg)">Remove</button></div>`;
+  }).join('')||'<p class="hint">No admins yet.</p>';
+}
+async function addAdmin(){
+  const email=prompt('Grant admin access to which @meatplus.ph email?');
+  if(!email)return;
+  if(!/@meatplus\.ph$/i.test(email.trim())){alert('Must be a @meatplus.ph email address.');return;}
+  const{error}=await sb.from('fp_access').insert({email:email.trim().toLowerCase(),role:'admin'});
+  if(error){alert(error.message);return;}
+  loadAccess();
+}
+async function removeAdmin(email){
+  const you=email.toLowerCase()===CURRENT_EMAIL.toLowerCase();
+  if(you){ if(!confirm('Remove your OWN admin access? You will be locked out immediately.'))return; }
+  else if(!confirm('Remove admin access for '+email+'?'))return;
+  const{error}=await sb.from('fp_access').delete().ilike('email',email);
+  if(error){alert(error.message);return;}
+  if(you){await signOut();return;}
+  loadAccess();
 }
 
 /* ================= COMPANIES (cloud) ================= */
