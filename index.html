@@ -80,6 +80,7 @@
     <label>Password</label><input id="auPass" type="password" placeholder="••••••••" autocomplete="current-password">
     <button class="primary" id="btnSignIn">Sign in</button>
     <button class="link" id="btnSignUp">New here? Create an account</button>
+    <button class="link" id="btnForgot">Forgot password?</button>
     <div id="authMsg"></div>
   </div>
 </div>
@@ -123,6 +124,7 @@
     <span id="whoami"></span>
     <span id="roleBadge" style="background:rgba(255,255,255,.25);border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700"></span>
     <button id="btnAccess" onclick="openAccess()">🔑 Manage Access</button>
+    <button onclick="changePassword()">Change password</button>
     <button onclick="signOut()">Sign out</button>
   </div>
 </header>
@@ -320,7 +322,48 @@ $('btnSignUp').onclick=async()=>{
   else setMsg('Account created. Check your email to confirm, then sign in.','ok');
 };
 async function signOut(){await sb.auth.signOut();}
-sb.auth.onAuthStateChange((_e,session)=>{ session?showApp(session):showAuth(); });
+
+// Forgot password — send a reset link by email
+$('btnForgot').onclick=async()=>{
+  const email=(prompt('Enter your @meatplus.ph email to receive a password-reset link:',$('auEmail').value.trim())||'').trim();
+  if(!email)return;
+  if(!/@meatplus\.ph$/i.test(email)){setMsg('Use your @meatplus.ph company email.','err');return;}
+  const{error}=await sb.auth.resetPasswordForEmail(email,{redirectTo:window.location.origin+window.location.pathname});
+  if(error){setMsg(error.message,'err');return;}
+  setMsg('If that email has an account, a reset link has been sent. Open it to set a new password.','ok');
+};
+// Change password while signed in
+async function changePassword(){
+  const p=prompt('Enter your NEW password (at least 6 characters):');
+  if(p===null)return;
+  if(p.length<6){alert('Password must be at least 6 characters.');return;}
+  const p2=prompt('Re-type the new password to confirm:');
+  if(p2===null)return;
+  if(p!==p2){alert('Passwords do not match. Nothing changed.');return;}
+  const{error}=await sb.auth.updateUser({password:p});
+  if(error){alert(error.message);return;}
+  alert('Password updated. Use your new password next time you sign in.');
+}
+// Password-recovery: user arriving from the reset-email link
+let RECOVERING=false;
+async function handleRecovery(){
+  RECOVERING=true;
+  $('auth').style.display='none';$('appwrap').style.display='none';$('pending').style.display='none';
+  let p=prompt('Set your new password (at least 6 characters):');
+  while(p!==null && p.length<6) p=prompt('Too short. Set a new password with at least 6 characters:');
+  if(p===null){RECOVERING=false;return;}
+  const{error}=await sb.auth.updateUser({password:p});
+  RECOVERING=false;
+  if(error){alert(error.message);showAuth();return;}
+  alert('Password set. You are now signed in.');
+  const{data}=await sb.auth.getSession();
+  data.session?showApp(data.session):showAuth();
+}
+sb.auth.onAuthStateChange((event,session)=>{
+  if(event==='PASSWORD_RECOVERY'){ handleRecovery(); return; }
+  if(RECOVERING) return;
+  session?showApp(session):showAuth();
+});
 function showAuth(){$('auth').style.display='flex';$('appwrap').style.display='none';$('pending').style.display='none';}
 
 let CURRENT_EMAIL='', CURRENT_ROLE='';
