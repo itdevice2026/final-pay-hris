@@ -213,6 +213,7 @@
         <div class="field"><label>Unused VL — days</label><input id="vlDays" type="number" min="0" step="0.5" placeholder="3"></div>
         <div class="field"><label>13th Month Pay Due (₱)</label><input id="thirteenth" type="number" min="0" step="0.01" placeholder="17500"><div class="hint">Enter amount, or use ⚙ to pro-rate.</div></div>
         <div class="field"><label>Other unpaid pay (OT, holiday, allowances)</label><input id="otherPay" type="number" min="0" step="0.01" placeholder="0"></div>
+        <div class="field"><label>De Minimis benefits (₱)</label><input id="deMinimis" type="number" min="0" step="0.01" placeholder="0"><div class="hint">On top of basic salary; tax-exempt (rice, uniform, meal, medical, laundry, etc.).</div></div>
       </div>
       <button class="act" style="flex:0;padding:7px 12px;background:#eef0f3;color:var(--ink);font-size:12px" onclick="prorate13th()">⚙ Pro-rate 13th from YTD basic</button>
     </div>
@@ -258,6 +259,7 @@
         <div class="row-money"><span>Unused VL</span><b id="o_vl">₱0.00</b></div>
         <div class="row-money"><span>13th month pay</span><b id="o_13th">₱0.00</b></div>
         <div class="row-money"><span>Other pay</span><b id="o_other">₱0.00</b></div>
+        <div class="row-money"><span>De Minimis (tax-exempt)</span><b id="o_dm">₱0.00</b></div>
         <div class="row-money"><span>Separation pay</span><b id="o_sep">₱0.00</b></div>
         <div class="totline"><span>Total Earnings</span><b id="o_gross" class="pos">₱0.00</b></div>
       </div>
@@ -704,15 +706,15 @@ function compute(){
   const reason=$('reason').value;
   if(!userTouchedSepRate)$('sepRate').value=String(REASON_RATE[reason]);
   $('sepYears').value=los.yrs;
-  const salary=num('unpaidDays')*daily,sil=num('silDays')*daily,vl=num('vlDays')*daily,thir=num('thirteenth'),other=num('otherPay');
+  const salary=num('unpaidDays')*daily,sil=num('silDays')*daily,vl=num('vlDays')*daily,thir=num('thirteenth'),other=num('otherPay'),dm=num('deMinimis');
   const sepRate=parseFloat($('sepRate').value)||0,sepBase=num('sepBase'),sepYears=num('sepYears');
   let sep=sepRate*sepBase*sepYears;if(sepRate>0&&sep<sepBase)sep=sepBase;if(sepRate===0)sep=0;
-  const gross=salary+sil+vl+thir+other+sep;
+  const gross=salary+sil+vl+thir+other+dm+sep;
   const gov=num('dSSS')+num('dPHIC')+num('dHDMF'),loans=num('dLoans'),tax=num('dTax'),acct=num('dAssets')+num('dOther');
   const ded=gov+loans+tax+acct,net=gross-ded;
-  LAST={daily,salary,sil,vl,thir,other,sep,sepRate,sepBase,sepYears,gross,gov,loans,tax,acct,ded,net};
+  LAST={daily,salary,sil,vl,thir,other,dm,sep,sepRate,sepBase,sepYears,gross,gov,loans,tax,acct,ded,net};
   $('o_unpaid').textContent=peso(salary);$('o_sil').textContent=peso(sil);$('o_vl').textContent=peso(vl);
-  $('o_13th').textContent=peso(thir);$('o_other').textContent=peso(other);$('o_sep').textContent=peso(sep);
+  $('o_13th').textContent=peso(thir);$('o_other').textContent=peso(other);$('o_dm').textContent=peso(dm);$('o_sep').textContent=peso(sep);
   $('o_gross').textContent=peso(gross);$('o_gov').textContent=peso(gov);$('o_loans').textContent=peso(loans);
   $('o_tax').textContent=peso(tax);$('o_acct').textContent=peso(acct);$('o_ded').textContent=peso(ded);$('o_net').textContent=peso(net);
   $('sepNote').textContent=sepRate>0?`${REASON_LABEL[reason]}: ${sepRate===1?'1 month':'½ month'} pay × ${sepYears} yr, min. 1 month.`:`${REASON_LABEL[reason]}: no statutory separation pay (unless company policy provides).`;
@@ -727,6 +729,7 @@ function compute(){
   const rows=[['EARNINGS','',''],['Salary',`${num('unpaidDays')} day(s) × ${peso(daily)}`,salary],
     ['Unused SIL',`${num('silDays')} day(s) × ${peso(daily)}`,sil],['Unused VL',`${num('vlDays')} day(s) × ${peso(daily)}`,vl],
     ['13th month pay','',thir],['Other pay','OT / holiday / allowances',other],
+    ['De Minimis','tax-exempt benefits',dm],
     ['Separation pay',sepRate>0?`${sepRate===1?'1':'½'} mo × ${sepYears} yr × ${peso(sepBase)}`:'—',sep],
     ['Total Earnings','',gross,'tot'],['DEDUCTIONS','',''],['SSS / PhilHealth / Pag-IBIG','',gov],
     ['Salary loan / advance','',loans],['Withholding tax','',tax],['Assets & other','',acct],
@@ -746,7 +749,7 @@ async function saveRecord(){
     resign_date:$('resignDate').value||null,date_hired:$('dateHired').value||null,last_day:$('lastDay').value||null,
     monthly:num('monthly'),factor:parseInt($('factor').value)||0,daily:LAST.daily,
     days_worked:num('unpaidDays'),sil_days:num('silDays'),vl_days:num('vlDays'),
-    thirteenth:num('thirteenth'),other_pay:num('otherPay'),
+    thirteenth:num('thirteenth'),other_pay:num('otherPay'),de_minimis:num('deMinimis'),
     sep_rate:LAST.sepRate,sep_years:LAST.sepYears,sep_base:LAST.sepBase,sep_pay:LAST.sep,
     d_sss:num('dSSS'),d_phic:num('dPHIC'),d_hdmf:num('dHDMF'),d_loans:num('dLoans'),
     d_tax:num('dTax'),d_assets:num('dAssets'),d_other:num('dOther'),
@@ -758,7 +761,7 @@ async function saveRecord(){
 }
 function resetForm(){
   if(!confirm('Clear all fields?'))return;
-  ['empName','empId','empPos','resignDate','dateHired','lastDay','monthly','daily','unpaidDays','silDays','vlDays','thirteenth','otherPay','sepBase','dSSS','dPHIC','dHDMF','dLoans','dTax','dAssets','dOther']
+  ['empName','empId','empPos','resignDate','dateHired','lastDay','monthly','daily','unpaidDays','silDays','vlDays','thirteenth','otherPay','deMinimis','sepBase','dSSS','dPHIC','dHDMF','dLoans','dTax','dAssets','dOther']
     .forEach(f=>$(f).value='');
   $('reason').selectedIndex=0;$('factor').selectedIndex=0;
   userTouchedSepRate=userTouchedSepBase=userTouchedDaily=false;compute();
@@ -771,7 +774,7 @@ $('sepBase').addEventListener('input',()=>{userTouchedSepBase=true;compute();});
 $('daily').addEventListener('input',()=>{userTouchedDaily=true;compute();});
 $('factor').addEventListener('change',()=>{userTouchedDaily=($('factor').value==='0');compute();});
 $('reason').addEventListener('change',()=>{userTouchedSepRate=false;compute();});
-['empName','empId','empPos','resignDate','dateHired','lastDay','monthly','daily','unpaidDays','silDays','vlDays','thirteenth','otherPay','sepYears','sepBase','dSSS','dPHIC','dHDMF','dLoans','dTax','dAssets','dOther']
+['empName','empId','empPos','resignDate','dateHired','lastDay','monthly','daily','unpaidDays','silDays','vlDays','thirteenth','otherPay','deMinimis','sepYears','sepBase','dSSS','dPHIC','dHDMF','dLoans','dTax','dAssets','dOther']
   .forEach(f=>$(f).addEventListener('input',compute));
 
 /* init: check existing session */
