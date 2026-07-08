@@ -409,8 +409,9 @@ async function loadAccess(){
         <div class="hint" style="margin:2px 0 0">${a.email}</div>
       </span>
       <span style="white-space:nowrap">
-        <button onclick="editUser('${em}')" style="border:none;background:#eef0f3;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;color:var(--ink)">Edit</button>
-        <button onclick="removeUser('${em}')" style="border:none;background:#fdecec;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;color:var(--neg)">Remove</button>
+        <button onclick="editUser('${em}')" style="border:none;background:#eef0f3;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:700;cursor:pointer;color:var(--ink)">Edit</button>
+        <button onclick="setUserPassword('${em}')" style="border:none;background:#e8f0fe;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:700;cursor:pointer;color:#1a56db">Set PW</button>
+        <button onclick="removeUser('${em}')" style="border:none;background:#fdecec;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:700;cursor:pointer;color:var(--neg)">Remove</button>
       </span></div>`;
   }).join('')||'<p class="hint">No users yet.</p>';
 }
@@ -441,6 +442,16 @@ async function editUser(email){
   if(error){alert(error.message);return;}
   if(you && role!=='admin'){await showApp((await sb.auth.getSession()).data.session);return;}
   loadAccess();
+}
+// Admin sets a user's password directly (via secure edge function — no email/link needed)
+async function setUserPassword(email){
+  const p=prompt('Set a NEW password for '+email+' (min 6 characters).\nThe user is NOT notified — share it with them yourself.');
+  if(p===null)return;
+  if(p.length<6){alert('Password must be at least 6 characters.');return;}
+  const{data,error}=await sb.functions.invoke('admin-set-password',{body:{email,password:p}});
+  if(error){alert('Failed: '+(error.message||error));return;}
+  if(data&&data.error){alert('Failed: '+data.error);return;}
+  alert('Password set for '+email+'.\nThey can now sign in with it.');
 }
 async function removeUser(email){
   const you=email.toLowerCase()===CURRENT_EMAIL.toLowerCase();
