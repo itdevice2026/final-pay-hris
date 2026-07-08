@@ -216,7 +216,8 @@
         <div class="field"><label>Date of Resignation / Submitted</label><input id="resignDate" type="date"></div>
         <div class="field"><label>Date Hired</label><input id="dateHired" type="date"></div>
         <div class="field"><label>Last Day Worked</label><input id="lastDay" type="date"></div>
-        <div class="field"><label>Payroll Cut-off Date</label><input id="cutoffDate" type="date"></div>
+        <div class="field"><label>Payroll Cut-off (From)</label><input id="cutoffFrom" type="date"></div>
+        <div class="field"><label>Payroll Cut-off (To)</label><input id="cutoffTo" type="date"></div>
       </div>
       <div class="field"><label>Length of Service (auto)</label><input id="losText" readonly value="—"></div>
     </div>
@@ -786,7 +787,7 @@ function compute(){
     coyinfo:[coy&&coy.address,coy&&coy.tin?('TIN: '+coy.tin):''].filter(Boolean).join(' · '),
     name:$('empName').value||'—', id:$('empId').value||'—', pos:$('empPos').value||'—',
     reason:REASON_LABEL[reason], hired:$('dateHired').value||'—', last:$('lastDay').value||'—',
-    cutoff:$('cutoffDate').value||'', remarks:$('remarks').value||'',
+    cutoff:[$('cutoffFrom').value,$('cutoffTo').value].filter(Boolean).join(' to '), remarks:$('remarks').value||'',
     los:los.text, monthly:peso(monthly), daily:peso(daily),
     date:new Date().toLocaleString('en-PH'), ref:CURRENT_REF||'',
     sign:SIGNATORIES[parseInt($('signatory').value)||0],
@@ -863,7 +864,7 @@ function printSavedRecord(id){
     ref:r.ref_no||'',
     name:r.emp_name||'—', id:r.emp_code||'—', pos:r.position||'—',
     reason:REASON_LABEL[r.reason]||r.reason||'—', hired:r.date_hired||'—', last:r.last_day||'—',
-    cutoff:r.cutoff_date||'', remarks:r.notes||'',
+    cutoff:[r.cutoff_date,r.cutoff_to].filter(Boolean).join(' to '), remarks:r.notes||'',
     los:losBetween(r.date_hired,r.last_day), monthly:peso(+r.monthly||0), daily:peso(daily),
     date:new Date(r.created_at||Date.now()).toLocaleString('en-PH'),
     sign:{name:sp[0]||'', title:sp[1]||''},
@@ -885,7 +886,7 @@ function editSavedRecord(id){
   const set=(f,v)=>{ if($(f))$(f).value=(v==null?'':v); };
   set('empName',r.emp_name);set('empId',r.emp_code);set('empPos',r.position);
   $('reason').value=r.reason||'resign';
-  set('resignDate',r.resign_date);set('dateHired',r.date_hired);set('lastDay',r.last_day);set('cutoffDate',r.cutoff_date);
+  set('resignDate',r.resign_date);set('dateHired',r.date_hired);set('lastDay',r.last_day);set('cutoffFrom',r.cutoff_date);set('cutoffTo',r.cutoff_to);
   set('monthly',r.monthly);
   if([...$('factor').options].some(o=>o.value==String(r.factor)))$('factor').value=String(r.factor); else $('factor').value='0';
   set('daily',r.daily);
@@ -977,7 +978,7 @@ async function saveRecord(){
   const rec={company_id:coy.id||null,company_name:coy.name||'',
     emp_name:$('empName').value,emp_code:$('empId').value,position:$('empPos').value,reason:$('reason').value,
     resign_date:$('resignDate').value||null,date_hired:$('dateHired').value||null,last_day:$('lastDay').value||null,
-    cutoff_date:$('cutoffDate').value||null,notes:$('remarks').value||'',
+    cutoff_date:$('cutoffFrom').value||null,cutoff_to:$('cutoffTo').value||null,notes:$('remarks').value||'',
     monthly:num('monthly'),factor:parseInt($('factor').value)||0,daily:LAST.daily,
     days_worked:num('unpaidDays'),sil_days:num('silDays'),vl_days:num('vlDays'),
     thirteenth:num('thirteenth'),other_pay:num('otherPay'),de_minimis:num('deMinimis'),
@@ -1007,7 +1008,7 @@ async function saveRecord(){
 }
 function resetForm(){
   if(!confirm('Clear all fields?'))return;
-  ['empName','empId','empPos','resignDate','dateHired','lastDay','cutoffDate','monthly','daily','unpaidDays','silDays','vlDays','thirteenth','otherPay','deMinimis','sepBase','dSSS','dPHIC','dHDMF','dLoans','dTax','dAssets','dOther','remarks']
+  ['empName','empId','empPos','resignDate','dateHired','lastDay','cutoffFrom','cutoffTo','monthly','daily','unpaidDays','silDays','vlDays','thirteenth','otherPay','deMinimis','sepBase','dSSS','dPHIC','dHDMF','dLoans','dTax','dAssets','dOther','remarks']
     .forEach(f=>$(f).value='');
   PREMS.forEach(([id])=>{if($(id))$(id).value='';});
   $('reason').selectedIndex=0;$('factor').selectedIndex=0;
@@ -1076,7 +1077,7 @@ $('daily').addEventListener('input',()=>{userTouchedDaily=true;compute();});
 $('factor').addEventListener('change',()=>{userTouchedDaily=($('factor').value==='0');compute();});
 $('reason').addEventListener('change',()=>{userTouchedSepRate=false;compute();});
 $('signatory').addEventListener('change',compute);
-['empName','empId','empPos','resignDate','dateHired','lastDay','cutoffDate','monthly','daily','unpaidDays','silDays','vlDays','thirteenth','otherPay','deMinimis','sepYears','sepBase','dSSS','dPHIC','dHDMF','dLoans','dTax','dAssets','dOther','remarks']
+['empName','empId','empPos','resignDate','dateHired','lastDay','cutoffFrom','cutoffTo','monthly','daily','unpaidDays','silDays','vlDays','thirteenth','otherPay','deMinimis','sepYears','sepBase','dSSS','dPHIC','dHDMF','dLoans','dTax','dAssets','dOther','remarks']
   .forEach(f=>$(f).addEventListener('input',compute));
 PREMS.forEach(([id])=>$(id).addEventListener('input',compute));
 
